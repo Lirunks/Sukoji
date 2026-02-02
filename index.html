@@ -3,22 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sukoji</title>
     
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Sukoji%22,%22short_name%22:%22Sukoji%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22#fdfcfd%22,%22theme_color%22:%22#fdfcfd%22}">
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sukoji">
     <link rel="apple-touch-icon" href="Icon.png">
+
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#fdfcfd">
-    
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Sukoji","short_name":"Sukoji","start_url":".","display":"standalone","background_color":"#fdfcfd","theme_color":"#ff9f43","icons":[{"src":"Icon.png","sizes":"192x192","type":"image/png"}]}'>
 
+    <title>Sukoji - For Kim-Làn</title>
     <style>
         :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; width: 100vw; height: 100vh; overflow: hidden; padding-top: env(safe-area-inset-top); }
-        .container { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); width: 100%; max-width: 400px; text-align: center; border: 1px solid #eee; margin-top: 10px; }
+        
+        body { 
+            font-family: -apple-system, sans-serif; 
+            background: var(--bg); display: flex; flex-direction: column; align-items: center; 
+            padding: 10px; margin: 0; width: 100vw; height: 100vh; overflow: hidden;
+            padding-top: env(safe-area-inset-top);
+            overscroll-behavior-y: contain; /* Prevents pull-to-refresh on Android/iOS */
+        }
+        
+        .container { 
+            background: white; padding: 15px; border-radius: 20px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05); 
+            width: 100%; max-width: 400px; text-align: center; border: 1px solid #eee; 
+            margin-top: 10px;
+        }
         h2 { color: var(--dark); margin: 0; font-size: 1.3rem; }
         .sub-title { color: var(--orange); font-weight: bold; margin-bottom: 15px; display: block; font-size: 1rem; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; position: relative; }
@@ -64,25 +78,17 @@
 let N = 9, isBlack = [], solvedGrid = [], startTime = 0;
 
 function getSegLen(r, c, type, board) {
-    let s = (type === 'row') ? c : r; let s_orig = s;
+    let s = (type === 'row') ? c : r;
+    let s_orig = s;
     while (s > 0 && !((type === 'row') ? board[r][s-1] : board[s-1][c])) s--;
-    let e = s_orig;
-    while (e < N-1 && !((type === 'row') ? board[r][e+1] : board[e+1][c])) e++;
-    return e - s + 1;
-}
-
-function canPlace(r, c, val, grid) {
-    let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
-    let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
-    for(let i=sc; i<=ec; i++) if(grid[r][i] === val) return false;
-    let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
-    let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
-    for(let i=sr; i<=er; i++) if(grid[i][c] === val) return false;
-    return true;
+    let startPos = s;
+    s = s_orig;
+    while (s < N-1 && !((type === 'row') ? board[r][s+1] : board[s+1][c])) s++;
+    return s - startPos + 1;
 }
 
 function solve(grid) {
-    if (Date.now() - startTime > 800) return false;
+    if (performance.now() - startTime > 1200) return false;
     let r = -1, c = -1, minOpts = 101;
     for(let i=0; i<N; i++) {
         for(let j=0; j<N; j++) {
@@ -105,6 +111,25 @@ function solve(grid) {
     return false;
 }
 
+function canPlace(r, c, val, grid) {
+    let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
+    let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
+    for(let i=sc; i<=ec; i++) if(grid[r][i] === val) return false;
+    let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
+    let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
+    for(let i=sr; i<=er; i++) if(grid[i][c] === val) return false;
+    return true;
+}
+
+function hasAnyBoxedCells(board) {
+    for(let r=0; r<N; r++) {
+        for(let c=0; c<N; c++) {
+            if(!board[r][c] && getSegLen(r, c, 'row', board) === 1 && getSegLen(r, c, 'col', board) === 1) return true;
+        }
+    }
+    return false;
+}
+
 async function generateGame() {
     N = parseInt(document.getElementById('size').value);
     const fillPercent = parseFloat(document.getElementById('diff').value);
@@ -115,13 +140,29 @@ async function generateGame() {
     let solved = false;
     while (!solved) {
         isBlack = Array.from({length: N}, () => Array(N).fill(false));
-        let count = 0;
-        while(count < (N + Math.floor(N/2))) {
-            let r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N);
-            if (!isBlack[r][c]) { isBlack[r][c] = true; count++; }
+        let O_limit = Math.floor(Math.sqrt(N)) + 1;
+        let O_actual = Math.floor(Math.random() * O_limit);
+        let clearRows = [], clearCols = [];
+        while(clearRows.length + clearCols.length < O_actual) {
+            let pick = Math.floor(Math.random() * N);
+            if(Math.random() > 0.5) { if(!clearRows.includes(pick)) clearRows.push(pick); }
+            else { if(!clearCols.includes(pick)) clearCols.push(pick); }
         }
+
+        let count = 0, att = 0;
+        while(count < (N + Math.floor(N/2)) && att < 1200) {
+            att++;
+            let r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N);
+            if (clearRows.includes(r) || clearCols.includes(c) || isBlack[r][c]) continue;
+            let ortho = (r>0 && isBlack[r-1][c]) || (r<N-1 && isBlack[r+1][c]) || (c>0 && isBlack[r][c-1]) || (c<N-1 && isBlack[r][c+1]);
+            if (!ortho) {
+                isBlack[r][c] = true;
+                if (hasAnyBoxedCells(isBlack)) isBlack[r][c] = false; else count++;
+            }
+        }
+        
         solvedGrid = Array.from({length: N}, () => Array(N).fill(0));
-        startTime = Date.now();
+        startTime = performance.now();
         if (solve(solvedGrid)) solved = true;
     }
 
@@ -159,14 +200,14 @@ function liveValidate() {
             if (!val) continue;
             const Lh = getSegLen(r, c, 'row', isBlack), Lv = getSegLen(r, c, 'col', isBlack);
             const limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv);
-            let rRep = false, cRep = false;
+            let rRepeat = false, cRepeat = false;
             let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
             let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
-            for(let i=sc; i<=ec; i++) if(i !== c && parseInt(allCells[r*N + i].querySelector('input').value) === val) rRep = true;
+            for(let i=sc; i<=ec; i++) if(i !== c && parseInt(allCells[r*N + i].querySelector('input').value) === val) rRepeat = true;
             let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
             let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
-            for(let i=sr; i<=er; i++) if(i !== r && parseInt(allCells[i*N + c].querySelector('input').value) === val) cRep = true;
-            if (val > limit || rRep || cRep) input.classList.add('invalid');
+            for(let i=sr; i<=er; i++) if(i !== r && parseInt(allCells[i*N + c].querySelector('input').value) === val) cRepeat = true;
+            if (val > limit || rRepeat || cRepeat) input.classList.add('invalid');
         }
     }
 }
