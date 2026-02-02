@@ -16,8 +16,6 @@
     <title>Sukoji</title>
 
     <script>
-        // THE "APP UNLOCKER" FOR ANDROID
-        // 1. Create a "Fake" Manifest file on the fly
         const manifest = {
             "name": "Sukoji",
             "short_name": "Sukoji",
@@ -30,9 +28,8 @@
         const stringManifest = JSON.stringify(manifest);
         const blob = new Blob([stringManifest], {type: 'application/json'});
         const manifestURL = URL.createObjectURL(blob);
-        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+        document.querySelector('head')?.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
 
-        // 2. Register a "Fake" Service Worker to satisfy Chrome's "Install" criteria
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `self.addEventListener('fetch', (event) => { event.respondWith(fetch(event.request)); });`;
@@ -44,7 +41,7 @@
     </script>
 
     <style>
-        :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; }
+        :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; --red-btn: #e74c3c; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: -apple-system, sans-serif; 
@@ -65,6 +62,8 @@
         .signature { position: absolute; right: 2px; top: -14px; color: var(--orange); font-size: 10px; font-weight: bold; }
         select, button { padding: 10px; border-radius: 10px; border: 1px solid #eee; font-size: 14px; background: white; width: 100%; outline: none; }
         .gen-btn { background: var(--dark); color: white; border: none; font-weight: bold; grid-column: span 2; cursor: pointer; margin-top: 5px; }
+        .clear-btn { background: var(--red-btn); color: white; border: none; font-weight: bold; grid-column: span 2; cursor: pointer; margin-top: 5px; padding: 10px; }
+
         #grid { display: grid; margin: 0 auto; background: #b2bec3; border: 2px solid var(--dark); gap: 1px; border-radius: 4px; width: 100%; aspect-ratio: 1 / 1; }
         .cell { background: white; display: flex; align-items: center; justify-content: center; }
         .cell.black { background: var(--dark); }
@@ -94,6 +93,7 @@
             <option value="0.25">Hard</option>
         </select>
         <button class="gen-btn" onclick="generateGame()">Generate Board</button>
+        <button class="clear-btn" onclick="clearUserBoard()">Clear Board</button>
     </div>
     <div id="grid"></div>
     <div class="status-msg" id="msg"></div>
@@ -101,7 +101,6 @@
 </div>
 
 <script>
-/* THE LOGIC BELOW IS 100% UNTOUCHED ALPHA 1.0 */
 let N = 9, isBlack = [], solvedGrid = [], startTime = 0;
 
 function getSegLen(r, c, type, board) {
@@ -215,6 +214,18 @@ async function generateGame() {
     document.getElementById('msg').innerText = "";
 }
 
+function clearUserBoard() {
+    const allInputs = document.querySelectorAll('#grid input');
+    allInputs.forEach(input => {
+        input.classList.remove('invalid');
+        if (!input.readOnly) {
+            input.value = "";
+        }
+    });
+    document.getElementById('msg').innerText = "Board cleared!";
+    setTimeout(() => { if(document.getElementById('msg').innerText === "Board cleared!") document.getElementById('msg').innerText = ""; }, 2000);
+}
+
 function liveValidate() {
     const allCells = document.querySelectorAll('#grid .cell');
     allCells.forEach(c => c.querySelector('input')?.classList.remove('invalid'));
@@ -243,7 +254,7 @@ function checkBoard() {
     const empty = Array.from(document.querySelectorAll('input')).some(i => !i.value);
     const errors = document.querySelectorAll('.invalid').length > 0;
     const msg = document.getElementById('msg');
-    if (empty) { msg.innerText = "LA thinks you're missing some..."; msg.style.color = "#e67e22"; }
+    if (empty) { msg.innerText = "You're missing some cells 🧐"; msg.style.color = "#e67e22"; }
     else if (errors) { msg.innerText = "You can do better 🫩"; msg.style.color = "#e74c3c"; }
     else { msg.innerText = "You did it! I 🧡 U"; msg.style.color = "#2ecc71"; }
 }
