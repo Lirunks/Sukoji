@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
     <title>Sukoji</title>
-    <meta name="apple-mobile-web-app-title" content="Sukoji">
-    <meta name="application-name" content="Sukoji">
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sukoji">
     <link rel="apple-touch-icon" href="Icon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#fdfcfd">
+
+    <link rel="manifest" href="data:application/manifest+json,{'name':'Sukoji','short_name':'Sukoji','start_url':'.','display':'standalone','background_color':'#fdfcfd','theme_color':'#ff9f43'}">
 
     <style>
         :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; }
@@ -201,7 +203,7 @@ function checkBoard() {
     const empty = inputs.some(i => !i.value);
     const errors = document.querySelectorAll('.invalid').length > 0;
     const msg = document.getElementById('msg');
-    if (empty) { msg.innerText = "You're missing some cells..."; msg.style.color = "#e67e22"; }
+    if (empty) { msg.innerText = "LA thinks you're missing some..."; msg.style.color = "#e67e22"; }
     else if (errors) { msg.innerText = "You can do better 🫩"; msg.style.color = "#e74c3c"; }
     else { msg.innerText = "You did it! I 🧡 U"; msg.style.color = "#2ecc71"; }
 }
