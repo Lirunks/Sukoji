@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="סוקוג'י">
+    <link rel="apple-touch-icon" href="Icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#fdfcfd">
+    <link rel="icon" type="image/png" href="Icon.png">
+
+    <title>סוקוג'י</title>
+
+    <script>
+        const manifest = {
+            "name": "סוקוג'י",
+            "short_name": "סוקוג'י",
+            "start_url": window.location.href,
+            "display": "standalone",
+            "background_color": "#fdfcfd",
+            "theme_color": "#fdfcfd",
+            "icons": [{ "src": "Icon.png", "sizes": "192x192", "type": "image/png" }]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('head')?.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `self.addEventListener('fetch', (event) => { event.respondWith(fetch(event.request)); });`;
+                const swBlob = new Blob([swCode], {type: 'text/javascript'});
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+            });
+        }
+    </script>
+
+    <style>
+        :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; --red-btn: #e74c3c; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, system-ui, sans-serif; 
+            background: var(--bg); display: flex; flex-direction: column; align-items: center; 
+            padding: 10px; margin: 0; width: 100vw; height: 100vh; overflow: hidden;
+            padding-top: env(safe-area-inset-top);
+            overscroll-behavior-y: contain;
+            direction: rtl;
+        }
+        .container { 
+            background: white; padding: 15px; border-radius: 20px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05); 
+            width: 100%; max-width: 400px; text-align: center; border: 1px solid #eee; 
+            margin-top: 10px;
+        }
+        h2 { color: var(--dark); margin: 0; font-size: 1.3rem; }
+        .sub-title { color: var(--orange); font-weight: bold; margin-bottom: 15px; display: block; font-size: 1rem; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; position: relative; }
+        .signature { position: absolute; left: 2px; top: -14px; color: var(--orange); font-size: 10px; font-weight: bold; }
+        select, button { padding: 10px; border-radius: 10px; border: 1px solid #eee; font-size: 14px; background: white; width: 100%; outline: none; }
+        .gen-btn { background: var(--dark); color: white; border: none; font-weight: bold; grid-column: span 2; cursor: pointer; margin-top: 5px; }
+        .clear-btn { background: var(--red-btn); color: white; border: none; font-weight: bold; grid-column: span 2; cursor: pointer; margin-top: 5px; padding: 10px; }
+        #grid { display: grid; margin: 0 auto; background: #b2bec3; border: 2px solid var(--dark); gap: 1px; border-radius: 4px; width: 100%; aspect-ratio: 1 / 1; direction: ltr; }
+        .cell { background: white; display: flex; align-items: center; justify-content: center; }
+        .cell.black { background: var(--dark); }
+        .cell input { width: 100%; height: 100%; border: none; text-align: center; font-size: 1.2rem; font-weight: bold; outline: none; background: transparent; color: #2d3436; padding: 0; appearance: none; }
+        .cell.fixed { background: #f8f9fa; }
+        .cell.fixed input { color: #0984e3; }
+        .invalid { color: var(--error) !important; background-color: #fff0f0; }
+        .status-msg { margin: 15px 0; font-weight: 700; font-size: 14px; min-height: 20px; }
+        .check-btn { background: var(--orange); color: white; border: none; font-weight: bold; width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>סוקוג'י</h2>
+    <span class="sub-title">למשפחה האהובה שלי 🧡</span>
+    <div class="controls">
+        <span class="signature">נוצר על ידי הדוד לירן</span>
+        <select id="size">
+            <option value="5">5x5</option>
+            <option value="7">7x7</option>
+            <option value="9" selected>9x9</option>
+        </select>
+        <select id="diff">
+            <option value="0.45">קל</option>
+            <option value="0.33" selected>בינוני</option>
+            <option value="0.25">קשה</option>
+        </select>
+        <button class="gen-btn" onclick="generateGame()">צור לוח חדש</button>
+        <button class="clear-btn" onclick="clearUserBoard()">נקה לוח</button>
+    </div>
+    <div id="grid"></div>
+    <div class="status-msg" id="msg"></div>
+    <button class="check-btn" onclick="checkBoard()">בדוק את הלוח</button>
+</div>
+
+<script>
+let N = 9, isBlack = [], solvedGrid = [], startTime = 0;
+
+function getSegLen(r, c, type, board) {
+    let s = (type === 'row') ? c : r;
+    let s_orig = s;
+    while (s > 0 && !((type === 'row') ? board[r][s-1] : board[s-1][c])) s--;
+    let e = s_orig;
+    while (e < N-1 && !((type === 'row') ? board[r][e+1] : board[e+1][c])) e++;
+    return e - s + 1;
+}
+
+function solve(grid) {
+    if (performance.now() - startTime > 1200) return false;
+    let r = -1, c = -1, minOpts = 101;
+    for(let i=0; i<N; i++) {
+        for(let j=0; j<N; j++) {
+            if(!isBlack[i][j] && grid[i][j] === 0) {
+                let Lh = getSegLen(i, j, 'row', isBlack), Lv = getSegLen(i, j, 'col', isBlack);
+                let limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv);
+                if(limit < minOpts) { minOpts = limit; r = i; c = j; }
+            }
+        }
+    }
+    if (r === -1) return true;
+    let nums = Array.from({length: minOpts}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+    for (let n of nums) {
+        if (canPlace(r, c, n, grid)) {
+            grid[r][c] = n;
+            if (solve(grid)) return true;
+            grid[r][c] = 0;
+        }
+    }
+    return false;
+}
+
+function canPlace(r, c, val, grid) {
+    let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
+    let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
+    for(let i=sc; i<=ec; i++) if(grid[r][i] === val) return false;
+    let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
+    let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
+    for(let i=sr; i<=er; i++) if(grid[i][c] === val) return false;
+    return true;
+}
+
+function hasAnyBoxedCells(board) {
+    for(let r=0; r<N; r++) {
+        for(let c=0; c<N; c++) { // TYPO FIXED HERE
+            if(!board[r][c] && getSegLen(r, c, 'row', board) === 1 && getSegLen(r, c, 'col', board) === 1) return true;
+        }
+    }
+    return false;
+}
+
+async function generateGame() {
+    N = parseInt(document.getElementById('size').value);
+    const fillPercent = parseFloat(document.getElementById('diff').value);
+    const gridDiv = document.getElementById('grid');
+    document.getElementById('msg').innerText = "יוצר לוח חדש 🤯";
+    await new Promise(r => setTimeout(r, 50));
+
+    let solved = false;
+    while (!solved) {
+        isBlack = Array.from({length: N}, () => Array(N).fill(false));
+        let O_limit = Math.floor(Math.sqrt(N)) + 1;
+        let O_actual = Math.floor(Math.random() * O_limit);
+        let clearRows = [], clearCols = [];
+        while(clearRows.length + clearCols.length < O_actual) {
+            let pick = Math.floor(Math.random() * N);
+            if(Math.random() > 0.5) { if(!clearRows.includes(pick)) clearRows.push(pick); }
+            else { if(!clearCols.includes(pick)) clearCols.push(pick); }
+        }
+
+        let count = 0, att = 0;
+        while(count < (N + Math.floor(N/2)) && att < 1200) {
+            att++;
+            let r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N);
+            if (clearRows.includes(r) || clearCols.includes(c) || isBlack[r][c]) continue;
+            let ortho = (r>0 && isBlack[r-1][c]) || (r<N-1 && isBlack[r+1][c]) || (c>0 && isBlack[r][c-1]) || (c<N-1 && isBlack[r][c+1]);
+            if (!ortho) {
+                isBlack[r][c] = true;
+                if (hasAnyBoxedCells(isBlack)) isBlack[r][c] = false; else count++;
+            }
+        }
+        
+        solvedGrid = Array.from({length: N}, () => Array(N).fill(0));
+        startTime = performance.now();
+        if (solve(solvedGrid)) solved = true;
+    }
+
+    gridDiv.innerHTML = '';
+    gridDiv.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+    for (let r=0; r<N; r++) {
+        for (let c=0; c<N; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell' + (isBlack[r][c] ? ' black' : '');
+            if (!isBlack[r][c]) {
+                const input = document.createElement('input');
+                input.type = 'tel';
+                if (Math.random() < fillPercent) {
+                    cell.classList.add('fixed');
+                    input.value = solvedGrid[r][c];
+                    input.readOnly = true;
+                }
+                input.oninput = () => liveValidate();
+                cell.appendChild(input);
+            }
+            gridDiv.appendChild(cell);
+        }
+    }
+    document.getElementById('msg').innerText = "";
+}
+
+function clearUserBoard() {
+    const allInputs = document.querySelectorAll('#grid input');
+    allInputs.forEach(input => {
+        input.classList.remove('invalid');
+        if (!input.readOnly) input.value = "";
+    });
+    document.getElementById('msg').innerText = "הלוח נוקה!";
+    setTimeout(() => { if(document.getElementById('msg').innerText === "הלוח נוקה!") document.getElementById('msg').innerText = ""; }, 2000);
+}
+
+function liveValidate() {
+    const allCells = document.querySelectorAll('#grid .cell');
+    allCells.forEach(c => c.querySelector('input')?.classList.remove('invalid'));
+    for (let r=0; r<N; r++) {
+        for (let c=0; c<N; c++) {
+            if (isBlack[r][c]) continue;
+            const input = allCells[r*N + c].querySelector('input');
+            const val = parseInt(input.value);
+            if (!val) continue;
+            const Lh = getSegLen(r, c, 'row', isBlack), Lv = getSegLen(r, c, 'col', isBlack);
+            const limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv);
+            let rRepeat = false, cRepeat = false;
+            let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
+            let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
+            for(let i=sc; i<=ec; i++) if(i !== c && parseInt(allCells[r*N + i].querySelector('input').value) === val) rRepeat = true;
+            let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
+            let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
+            for(let i=sr; i<=er; i++) if(i !== r && parseInt(allCells[i*N + c].querySelector('input').value) === val) cRepeat = true;
+            if (val > limit || rRepeat || cRepeat) input.classList.add('invalid');
+        }
+    }
+}
+
+function checkBoard() {
+    liveValidate();
+    const empty = Array.from(document.querySelectorAll('input')).some(i => !i.value);
+    const errors = document.querySelectorAll('.invalid').length > 0;
+    const msg = document.getElementById('msg');
+    if (empty) { msg.innerText = "חסרים לך כמה תאים 🧐"; msg.style.color = "#e67e22"; }
+    else if (errors) { msg.innerText = "יש טעויות, נסו שוב 🫩"; msg.style.color = "#e74c3c"; }
+    else { msg.innerText = "הצלחתם, כל הכבוד! 🧡"; msg.style.color = "#2ecc71"; }
+}
+generateGame();
+</script>
+</body>
+</html>
