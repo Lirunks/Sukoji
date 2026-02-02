@@ -7,14 +7,42 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Sukoji">
-    
+    <link rel="apple-touch-icon" href="Icon.png">
+
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#fdfcfd">
-
-    <link rel="apple-touch-icon" href="Icon.png">
     <link rel="icon" type="image/png" href="Icon.png">
 
     <title>Sukoji</title>
+
+    <script>
+        // THE "APP UNLOCKER" FOR ANDROID
+        // 1. Create a "Fake" Manifest file on the fly
+        const manifest = {
+            "name": "Sukoji",
+            "short_name": "Sukoji",
+            "start_url": window.location.href,
+            "display": "standalone",
+            "background_color": "#fdfcfd",
+            "theme_color": "#fdfcfd",
+            "icons": [{ "src": "Icon.png", "sizes": "192x192", "type": "image/png" }]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+
+        // 2. Register a "Fake" Service Worker to satisfy Chrome's "Install" criteria
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `self.addEventListener('fetch', (event) => { event.respondWith(fetch(event.request)); });`;
+                const swBlob = new Blob([swCode], {type: 'text/javascript'});
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+            });
+        }
+    </script>
+
     <style>
         :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -73,6 +101,7 @@
 </div>
 
 <script>
+/* THE LOGIC BELOW IS 100% UNTOUCHED ALPHA 1.0 */
 let N = 9, isBlack = [], solvedGrid = [], startTime = 0;
 
 function getSegLen(r, c, type, board) {
