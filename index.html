@@ -10,10 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sukoji">
     <link rel="apple-touch-icon" href="Icon.png">
+    
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#fdfcfd">
-
-    <link rel="manifest" href="data:application/manifest+json,{'name':'Sukoji','short_name':'Sukoji','start_url':'.','display':'standalone','background_color':'#fdfcfd','theme_color':'#ff9f43'}">
+    
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Sukoji","short_name":"Sukoji","start_url":".","display":"standalone","background_color":"#fdfcfd","theme_color":"#ff9f43","icons":[{"src":"Icon.png","sizes":"192x192","type":"image/png"}]}'>
 
     <style>
         :root { --orange: #ff9f43; --dark: #2d3436; --bg: #fdfcfd; --error: #ff7675; }
@@ -72,141 +73,16 @@
 </div>
 
 <script>
+// Game logic is exactly the same to keep the orange feedback and logic working!
 let N = 9, isBlack = [], solvedGrid = [], startTime = 0;
-
-function getSegLen(r, c, type, board) {
-    let s = (type === 'row') ? c : r;
-    let s_orig = s;
-    while (s > 0 && !((type === 'row') ? board[r][s-1] : board[s-1][c])) s--;
-    let e = s_orig;
-    while (e < N-1 && !((type === 'row') ? board[r][e+1] : board[e+1][c])) e++;
-    return e - s + 1;
-}
-
-function solve(grid) {
-    if (performance.now() - startTime > 1200) return false;
-    let r = -1, c = -1, minOpts = 101;
-    for(let i=0; i<N; i++) {
-        for(let j=0; j<N; j++) {
-            if(!isBlack[i][j] && grid[i][j] === 0) {
-                let Lh = getSegLen(i, j, 'row', isBlack), Lv = getSegLen(i, j, 'col', isBlack);
-                let limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv);
-                if(limit < minOpts) { minOpts = limit; r = i; c = j; }
-            }
-        }
-    }
-    if (r === -1) return true;
-    let nums = Array.from({length: minOpts}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
-    for (let n of nums) {
-        if (canPlace(r, c, n, grid)) {
-            grid[r][c] = n;
-            if (solve(grid)) return true;
-            grid[r][c] = 0;
-        }
-    }
-    return false;
-}
-
-function canPlace(r, c, val, grid) {
-    let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
-    let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
-    for(let i=sc; i<=ec; i++) if(grid[r][i] === val) return false;
-    let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
-    let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
-    for(let i=sr; i<=er; i++) if(grid[i][c] === val) return false;
-    return true;
-}
-
-function hasAnyBoxedCells(board) {
-    for(let r=0; r<N; r++) {
-        for(let c=0; c<N; c++) {
-            if(!board[r][c] && getSegLen(r, c, 'row', board) === 1 && getSegLen(r, c, 'col', board) === 1) return true;
-        }
-    }
-    return false;
-}
-
-async function generateGame() {
-    N = parseInt(document.getElementById('size').value);
-    const fillPercent = parseFloat(document.getElementById('diff').value);
-    const gridDiv = document.getElementById('grid');
-    document.getElementById('msg').innerText = "Creating your next Sukoji 🤯";
-    await new Promise(r => setTimeout(r, 50));
-
-    let solved = false;
-    while (!solved) {
-        isBlack = Array.from({length: N}, () => Array(N).fill(false));
-        let count = 0, att = 0;
-        while(count < (N + Math.floor(N/2)) && att < 1200) {
-            att++;
-            let r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N);
-            let ortho = (r>0 && isBlack[r-1][c]) || (r<N-1 && isBlack[r+1][c]) || (c>0 && isBlack[r][c-1]) || (c<N-1 && isBlack[r][c+1]);
-            if (!ortho && !isBlack[r][c]) {
-                isBlack[r][c] = true;
-                if (hasAnyBoxedCells(isBlack)) isBlack[r][c] = false; else count++;
-            }
-        }
-        solvedGrid = Array.from({length: N}, () => Array(N).fill(0));
-        startTime = performance.now();
-        if (solve(solvedGrid)) solved = true;
-    }
-
-    gridDiv.innerHTML = '';
-    gridDiv.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
-    for (let r=0; r<N; r++) {
-        for (let c=0; c<N; c++) {
-            const cell = document.createElement('div');
-            cell.className = 'cell' + (isBlack[r][c] ? ' black' : '');
-            if (!isBlack[r][c]) {
-                const input = document.createElement('input');
-                input.type = 'tel';
-                if (Math.random() < fillPercent) {
-                    cell.classList.add('fixed');
-                    input.value = solvedGrid[r][c];
-                    input.readOnly = true;
-                }
-                input.oninput = () => liveValidate();
-                cell.appendChild(input);
-            }
-            gridDiv.appendChild(cell);
-        }
-    }
-    document.getElementById('msg').innerText = "";
-}
-
-function liveValidate() {
-    const allCells = document.querySelectorAll('#grid .cell');
-    allCells.forEach(c => c.querySelector('input')?.classList.remove('invalid'));
-    for (let r=0; r<N; r++) {
-        for (let c=0; c<N; c++) {
-            if (isBlack[r][c]) continue;
-            const input = allCells[r*N + c].querySelector('input');
-            const val = parseInt(input.value);
-            if (!val) continue;
-            const Lh = getSegLen(r, c, 'row', isBlack), Lv = getSegLen(r, c, 'col', isBlack);
-            const limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv);
-            let rowRepeat = false, colRepeat = false;
-            let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--;
-            let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++;
-            for(let i=sc; i<=ec; i++) if(i !== c && parseInt(allCells[r*N + i].querySelector('input').value) === val) rowRepeat = true;
-            let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--;
-            let er = r; while(er < N-1 && !isBlack[er+1][c]) er++;
-            for(let i=sr; i<=er; i++) if(i !== r && parseInt(allCells[i*N + c].querySelector('input').value) === val) colRepeat = true;
-            if (val > limit || rowRepeat || colRepeat) input.classList.add('invalid');
-        }
-    }
-}
-
-function checkBoard() {
-    liveValidate();
-    const inputs = Array.from(document.querySelectorAll('input'));
-    const empty = inputs.some(i => !i.value);
-    const errors = document.querySelectorAll('.invalid').length > 0;
-    const msg = document.getElementById('msg');
-    if (empty) { msg.innerText = "LA thinks you're missing some..."; msg.style.color = "#e67e22"; }
-    else if (errors) { msg.innerText = "You can do better 🫩"; msg.style.color = "#e74c3c"; }
-    else { msg.innerText = "You did it! I 🧡 U"; msg.style.color = "#2ecc71"; }
-}
+function getSegLen(r, c, type, board) { let s = (type === 'row') ? c : r; let s_orig = s; while (s > 0 && !((type === 'row') ? board[r][s-1] : board[s-1][c])) s--; let e = s_orig; while (e < N-1 && !((type === 'row') ? board[r][e+1] : board[e+1][c])) e++; return e - s + 1; }
+function solve(grid) { if (performance.now() - startTime > 1200) return false; let r = -1, c = -1, minOpts = 101; for(let i=0; i<N; i++) { for(let j=0; j<N; j++) { if(!isBlack[i][j] && grid[i][j] === 0) { let Lh = getSegLen(i, j, 'row', isBlack), Lv = getSegLen(i, j, 'col', isBlack); let limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv); if(limit < minOpts) { minOpts = limit; r = i; c = j; } } } } if (r === -1) return true; let nums = Array.from({length: minOpts}, (_, i) => i + 1).sort(() => Math.random() - 0.5); for (let n of nums) { if (canPlace(r, c, n, grid)) { grid[r][c] = n; if (solve(grid)) return true; grid[r][c] = 0; } } return false; }
+function canPlace(r, c, val, grid) { let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--; let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++; for(let i=sc; i<=ec; i++) if(grid[r][i] === val) return false; let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--; let er = r; while(er < N-1 && !isBlack[er+1][c]) er++; for(let i=sr; i<=er; i++) if(grid[i][c] === val) return false; return true; }
+function hasAnyBoxedCells(board) { for(let r=0; r<N; r++) { for(let c=0; c<N; c++) { if(!board[r][c] && getSegLen(r, c, 'row', board) === 1 && getSegLen(r, c, 'col', board) === 1) return true; } } return false; }
+async function generateGame() { N = parseInt(document.getElementById('size').value); const fillPercent = parseFloat(document.getElementById('diff').value); const gridDiv = document.getElementById('grid'); document.getElementById('msg').innerText = "Creating your next Sukoji 🤯"; await new Promise(r => setTimeout(r, 50)); let solved = false; while (!solved) { isBlack = Array.from({length: N}, () => Array(N).fill(false)); let count = 0, att = 0; while(count < (N + Math.floor(N/2)) && att < 1200) { att++; let r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N); let ortho = (r>0 && isBlack[r-1][c]) || (r<N-1 && isBlack[r+1][c]) || (c>0 && isBlack[r][c-1]) || (c<N-1 && isBlack[r][c+1]); if (!ortho && !isBlack[r][c]) { isBlack[r][c] = true; if (hasAnyBoxedCells(isBlack)) isBlack[r][c] = false; else count++; } } solvedGrid = Array.from({length: N}, () => Array(N).fill(0)); startTime = performance.now(); if (solve(solvedGrid)) solved = true; }
+gridDiv.innerHTML = ''; gridDiv.style.gridTemplateColumns = `repeat(${N}, 1fr)`; for (let r=0; r<N; r++) { for (let c=0; c<N; c++) { const cell = document.createElement('div'); cell.className = 'cell' + (isBlack[r][c] ? ' black' : ''); if (!isBlack[r][c]) { const input = document.createElement('input'); input.type = 'tel'; if (Math.random() < fillPercent) { cell.classList.add('fixed'); input.value = solvedGrid[r][c]; input.readOnly = true; } input.oninput = () => liveValidate(); cell.appendChild(input); } gridDiv.appendChild(cell); } } document.getElementById('msg').innerText = ""; }
+function liveValidate() { const allCells = document.querySelectorAll('#grid .cell'); allCells.forEach(c => c.querySelector('input')?.classList.remove('invalid')); for (let r=0; r<N; r++) { for (let c=0; c<N; c++) { if (isBlack[r][c]) continue; const input = allCells[r*N + c].querySelector('input'); const val = parseInt(input.value); if (!val) continue; const Lh = getSegLen(r, c, 'row', isBlack), Lv = getSegLen(r, c, 'col', isBlack); const limit = (Lh === 1) ? Lv : (Lv === 1) ? Lh : Math.min(Lh, Lv); let rowRepeat = false, colRepeat = false; let sc = c; while(sc > 0 && !isBlack[r][sc-1]) sc--; let ec = c; while(ec < N-1 && !isBlack[r][ec+1]) ec++; for(let i=sc; i<=ec; i++) if(i !== c && parseInt(allCells[r*N + i].querySelector('input').value) === val) rowRepeat = true; let sr = r; while(sr > 0 && !isBlack[sr-1][c]) sr--; let er = r; while(er < N-1 && !isBlack[er+1][c]) er++; for(let i=sr; i<=er; i++) if(i !== r && parseInt(allCells[i*N + c].querySelector('input').value) === val) colRepeat = true; if (val > limit || rowRepeat || colRepeat) input.classList.add('invalid'); } } }
+function checkBoard() { liveValidate(); const inputs = Array.from(document.querySelectorAll('input')); const empty = inputs.some(i => !i.value); const errors = document.querySelectorAll('.invalid').length > 0; const msg = document.getElementById('msg'); if (empty) { msg.innerText = "LA thinks you're missing some..."; msg.style.color = "#e67e22"; } else if (errors) { msg.innerText = "You can do better 🫩"; msg.style.color = "#e74c3c"; } else { msg.innerText = "You did it! I 🧡 U"; msg.style.color = "#2ecc71"; } }
 generateGame();
 </script>
 </body>
